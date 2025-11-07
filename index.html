@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>兑换券兑换系统</title>
     <!-- 引入 Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -80,6 +80,20 @@
             <div id="message-area" class="mt-5 text-center p-4 rounded-lg text-sm font-medium hidden transition-all">
                 <!-- JS将在此处插入消息 -->
             </div>
+
+            <!-- [新增] 联系客服链接 (默认隐藏) -->
+            <!-- [FIXED] 修复了 'class.=' 的拼写错误 -->
+            <div id="customer-support" class="mt-6 text-center hidden">
+                <p class="text-sm text-gray-500">
+                    信息填写错误？
+                    <a href="tel:400-123-4567" class="font-medium text-blue-600 hover:text-blue-500 underline decoration-dotted">
+                        联系客服
+                    </a>
+                    <span class="text-gray-400 mx-1">|</span>
+                    <span class="text-gray-600">400-123-4567</span>
+                </p>
+            </div>
+            
         </div>
     </div>
 
@@ -100,9 +114,11 @@
         const submitLoader = document.getElementById('submit-loader');
 
         const messageArea = document.getElementById('message-area');
+        const customerSupportDiv = document.getElementById('customer-support'); // <-- [新增] 获取客服元素
 
         // 存储已验证的兑换券码
         let verifiedCouponCode = null;
+        let verifiedProductName = null; // <--- 新增: 存储产品名称
 
         // --- 步骤 1: 检查兑换券 ---
         checkButton.addEventListener('click', async () => {
@@ -114,6 +130,7 @@
 
             setLoading(true, 'check');
             hideMessage();
+            customerSupportDiv.classList.add('hidden'); // <-- [新增] 每次检查时，隐藏客服信息
 
             try {
                 // (关键) 调用新的 /api/check_coupon
@@ -131,6 +148,8 @@
 
                 // 检查成功！
                 verifiedCouponCode = data.code; // 存储已验证的券码
+                verifiedProductName = data.productName; // <--- 新增: 存储产品名称
+                
                 showMessage('兑换券有效！请填写收货信息。', 'success');
                 
                 // 更新UI：禁用步骤1，显示步骤2
@@ -159,6 +178,7 @@
 
             setLoading(true, 'submit');
             hideMessage();
+            customerSupportDiv.classList.add('hidden'); // <-- [新增] 提交时先隐藏（以防上次失败时显示）
 
             // 获取收货信息
             const name = document.getElementById('name').value;
@@ -191,13 +211,18 @@
                 }
 
                 // 最终成功！
-                showMessage('兑换成功！我们将尽快为您发货。', 'success');
+                // [CHANGED] 在成功消息中显示产品名称
+                showMessage(`兑换成功！您兑换的 "${verifiedProductName}" 我们将尽快为您发货。`, 'success');
+                
+                customerSupportDiv.classList.remove('hidden'); // <-- [新增] 兑换成功后，显示客服信息
+
                 form.reset();
                 couponInput.disabled = false;
                 checkButton.disabled = false;
                 checkButton.classList.remove('hidden');
                 shippingDetailsDiv.classList.add('hidden');
                 verifiedCouponCode = null;
+                verifiedProductName = null; // <--- 新增: 重置产品名称
 
 
             } catch (error) {
@@ -236,6 +261,7 @@
         function hideMessage() {
             messageArea.classList.add('hidden');
             messageArea.textContent = '';
+            // customerSupportDiv.classList.add('hidden'); // <-- [移除] 不在这里隐藏，只在开始新流程时隐藏
         }
 
     </script>

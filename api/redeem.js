@@ -47,14 +47,22 @@ export default async function handler(request, response) {
             throw new Error('数据库函数执行失败: ' + error.message);
         }
 
-        if (data === 'SUCCESS') {
-            // 兑换成功
-            return response.status(200).json({ success: true, message: '兑换成功' });
-        } else if (data === 'INVALID_OR_REDEEMED') {
+        // [CHANGED] 数据库函数现在返回产品名称,
+        // 或者返回 'INVALID_OR_REDEEMED' / 'ERROR'
+        
+        if (data === 'INVALID_OR_REDEEMED') {
             // 兑换券无效或已被使用
             return response.status(400).json({ error: '兑换券无效或已被使用' });
+        } else if (data === 'ERROR') {
+            // 数据库函数内部发生异常
+            return response.status(500).json({ error: '服务器内部错误：兑换时发生错误' });
+        } else if (data) {
+            // 兑换成功, data 变量现在是产品名称字符串
+            // 我们不需要将产品名称传回前端（因为前端已经有了），
+            // 但我们知道操作已成功。
+            return response.status(200).json({ success: true, message: '兑换成功' });
         } else {
-            // 数据库函数返回了意外的结果
+            // 数据库函数返回了意外的结果 (例如 null)
             return response.status(500).json({ error: '服务器内部错误：未知的兑换结果' });
         }
 

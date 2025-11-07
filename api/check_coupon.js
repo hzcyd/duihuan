@@ -30,10 +30,10 @@ export default async function handler(request, response) {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
         // 4. (关键) 直接查询 'coupons' 表
-        // 我们只检查，不调用 RPC 函数
+        // [CHANGED] 我们现在也 select 'product_name'
         const { data: coupon, error } = await supabase
             .from('coupons')
-            .select('code, is_redeemed')
+            .select('code, is_redeemed, product_name') // <--- 修改点
             .eq('code', code)
             .single(); // .single() 期望只找到一行，否则会报错
 
@@ -50,7 +50,12 @@ export default async function handler(request, response) {
         }
 
         // 6. 兑换券有效且未使用
-        return response.status(200).json({ success: true, code: coupon.code });
+        // [CHANGED] 在响应中添加 productName
+        return response.status(200).json({ 
+            success: true, 
+            code: coupon.code,
+            productName: coupon.product_name || '精美礼品' // <--- 新增 (如果名称为空，提供默认值)
+        });
 
     } catch (error) {
         // 捕获任何 JavaScript 运行时错误
