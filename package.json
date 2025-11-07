@@ -1,0 +1,9 @@
+{
+  "name": "redemption-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Supabase + Vercel 兑换系统",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.4"
+  }
+}

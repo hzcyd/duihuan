@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>兑换券兑换系统</title>
+    <!-- 引入 Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 简单的加载中动画 */
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="container mx-auto max-w-lg p-6 min-h-screen flex items-center justify-center">
+        
+        <div class="bg-white w-full p-8 rounded-xl shadow-lg transition-all">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+                礼品兑换系统
+            </h1>
+            
+            <!-- 兑换表单 -->
+            <!-- 注意：我们现在有两个独立的按钮来控制流程 -->
+            <form id="redeem-form" class="space-y-5">
+                
+                <!-- 步骤 1: 兑换券码 -->
+                <div>
+                    <label for="coupon-code" class="block text-sm font-medium text-gray-700 mb-1">兑换券码</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="coupon-code" name="coupon-code" required
+                               class="flex-grow w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-200"
+                               placeholder="请输入您的兑换券码">
+                        <button type="button" id="check-button"
+                                class="flex-shrink-0 px-5 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-50">
+                            <span id="check-button-text">检查</span>
+                            <div id="check-loader" class="loader w-5 h-5 rounded-full border-2 border-t-2 border-gray-200 hidden"></div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 步骤 2: 收货信息 (默认隐藏) -->
+                <div id="shipping-details" class="hidden space-y-5 pt-4 border-t border-gray-200">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">收货人姓名</label>
+                        <input type="text" id="name" name="name" required
+                               class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                               placeholder="请输入您的姓名">
+                    </div>
+
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+                        <input type="tel" id="phone" name="phone" required
+                               class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                               placeholder="请输入您的手机号码">
+                    </div>
+
+                    <div>
+                        <label for="address" class="block text-sm font-medium text-gray-700 mb-1">详细收货地址</label>
+                        <textarea id="address" name="address" rows="3" required
+                                  class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                  placeholder="请输入您的详细地址"></textarea>
+                    </div>
+
+                    <!-- 最终提交按钮 -->
+                    <button type="submit" id="submit-button" 
+                            class="w-full flex items-center justify-center px-6 py-4 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait">
+                        <span id="submit-button-text">确认兑换</span>
+                        <div id="submit-loader" class="loader w-5 h-5 rounded-full border-2 border-t-2 border-gray-200 ml-3 hidden"></div>
+                    </button>
+                </div>
+            </form>
+
+            <!-- 消息提示区域 -->
+            <div id="message-area" class="mt-5 text-center p-4 rounded-lg text-sm font-medium hidden transition-all">
+                <!-- JS将在此处插入消息 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 元素
+        const form = document.getElementById('redeem-form');
+        const couponInput = document.getElementById('coupon-code');
+        
+        // 步骤 1 (检查)
+        const checkButton = document.getElementById('check-button');
+        const checkButtonText = document.getElementById('check-button-text');
+        const checkLoader = document.getElementById('check-loader');
+        
+        // 步骤 2 (提交)
+        const shippingDetailsDiv = document.getElementById('shipping-details');
+        const submitButton = document.getElementById('submit-button');
+        const submitButtonText = document.getElementById('submit-button-text');
+        const submitLoader = document.getElementById('submit-loader');
+
+        const messageArea = document.getElementById('message-area');
+
+        // 存储已验证的兑换券码
+        let verifiedCouponCode = null;
+
+        // --- 步骤 1: 检查兑换券 ---
+        checkButton.addEventListener('click', async () => {
+            const couponCode = couponInput.value.trim();
+            if (!couponCode) {
+                showMessage('请输入兑换券码', 'error');
+                return;
+            }
+
+            setLoading(true, 'check');
+            hideMessage();
+
+            try {
+                // (关键) 调用新的 /api/check_coupon
+                const response = await fetch('/api/check_coupon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: couponCode }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '检查失败');
+                }
+
+                // 检查成功！
+                verifiedCouponCode = data.code; // 存储已验证的券码
+                showMessage('兑换券有效！请填写收货信息。', 'success');
+                
+                // 更新UI：禁用步骤1，显示步骤2
+                couponInput.disabled = true;
+                checkButton.disabled = true;
+                checkButton.classList.add('hidden'); // 隐藏检查按钮
+                shippingDetailsDiv.classList.remove('hidden'); // 显示收货表单
+
+            } catch (error) {
+                console.error('检查失败:', error);
+                showMessage(error.message, 'error');
+            } finally {
+                setLoading(false, 'check');
+            }
+        });
+
+        // --- 步骤 2: 提交兑换信息 ---
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // 阻止表单默认提交
+
+            // 确认我们已经通过了步骤1
+            if (!verifiedCouponCode) {
+                showMessage('请先检查您的兑换券码', 'error');
+                return;
+            }
+
+            setLoading(true, 'submit');
+            hideMessage();
+
+            // 获取收货信息
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const address = document.getElementById('address').value;
+
+            if (!name || !phone || !address) {
+                showMessage('所有收货信息均为必填项', 'error');
+                setLoading(false, 'submit');
+                return;
+            }
+
+            try {
+                // (关键) 调用原始的 /api/redeem
+                const response = await fetch('/api/redeem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: verifiedCouponCode, // 使用已验证的券码
+                        name: name,
+                        phone: phone,
+                        address: address
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '兑换失败');
+                }
+
+                // 最终成功！
+                showMessage('兑换成功！我们将尽快为您发货。', 'success');
+                form.reset();
+                couponInput.disabled = false;
+                checkButton.disabled = false;
+                checkButton.classList.remove('hidden');
+                shippingDetailsDiv.classList.add('hidden');
+                verifiedCouponCode = null;
+
+
+            } catch (error) {
+                console.error('兑换失败:', error);
+                showMessage(error.message, 'error');
+            } finally {
+                setLoading(false, 'submit');
+            }
+        });
+
+        // -- 辅助函数 --
+
+        function setLoading(isLoading, type = 'check') {
+            if (type === 'check') {
+                checkButton.disabled = isLoading;
+                checkButtonText.classList.toggle('hidden', isLoading);
+                checkLoader.classList.toggle('hidden', !isLoading);
+            } else if (type === 'submit') {
+                submitButton.disabled = isLoading;
+                submitButtonText.classList.toggle('hidden', isLoading);
+                submitLoader.classList.toggle('hidden', !isLoading);
+            }
+        }
+
+        function showMessage(message, type = 'error') {
+            messageArea.textContent = message;
+            messageArea.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            
+            if (type === 'error') {
+                messageArea.classList.add('bg-red-100', 'text-red-700');
+            } else {
+                messageArea.classList.add('bg-green-100', 'text-green-700');
+            }
+        }
+
+        function hideMessage() {
+            messageArea.classList.add('hidden');
+            messageArea.textContent = '';
+        }
+
+    </script>
+</body>
+</html>
