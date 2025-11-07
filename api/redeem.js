@@ -32,7 +32,8 @@ export default async function handler(request, response) {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
         // 4. (关键) 调用我们在 SQL 中创建的 'redeem_coupon' 数据库函数
-        const { data, error }_ = await supabase.rpc('redeem_coupon', {
+        // [FIXED] 移除了 'error' 后面多余的下划线
+        const { data, error } = await supabase.rpc('redeem_coupon', {
             coupon_code: code,
             user_name: name,
             user_phone: phone,
